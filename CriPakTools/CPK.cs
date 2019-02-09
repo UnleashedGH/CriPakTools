@@ -1,39 +1,41 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+
 
 namespace CriPakTools
 {
     public class CPK
     {
         public List<FileEntry> FileTable;
-        public Dictionary<string, object> cpkdata;
-        public UTF utf;
-
-        Tools tools;
+        string cName;
+        UTF utf;
         UTF files;
 
-        public CPK(Tools tool)
+        public CPK()
         {
-            tools = tool;
+           
             isUtfEncrypted = false;
             FileTable = new List<FileEntry>();
+
         }
 
+        
+      
         public bool ReadCPK(string sPath)
         {
             if (File.Exists(sPath))
             {
                 uint Files;
                 ushort Align;
-
+                cName = sPath;
                 EndianReader br = new EndianReader(File.OpenRead(sPath), true);
                 MemoryStream ms;
                 EndianReader utfr;
-
-                if (tools.ReadCString(br, 4) != "CPK ")
+				
+                if (Tools.ReadCString(br, 4) != "CPK ")
                 {
                     br.Close();
                     return false;
@@ -42,8 +44,7 @@ namespace CriPakTools
                 ReadUTFData(br);
 
                 CPK_packet = utf_packet;
-                //Dump CPK
-                //File.WriteAllBytes("U_CPK", CPK_packet);
+         
 
                 FileEntry CPAK_entry = new FileEntry
                 {
@@ -59,7 +60,7 @@ namespace CriPakTools
                 ms = new MemoryStream(utf_packet);
                 utfr = new EndianReader(ms, false);
 
-                utf = new UTF(tools);
+                utf = new UTF();
                 if (!utf.ReadUTF(utfr))
                 {
                     br.Close();
@@ -69,39 +70,28 @@ namespace CriPakTools
                 utfr.Close();
                 ms.Close();
 
-                cpkdata = new Dictionary<string, object>();
+          
 
-                try
-                {
-                    for (int i = 0; i < utf.columns.Count; i++)
-                    {
-                        cpkdata.Add(utf.columns[i].name, utf.rows[0].rows[i].GetValue());
-                    }
-                }
-                catch (Exception ex)
-                {
-                    //MessageBox.Show(ex.ToString());
-                    Console.WriteLine(ex.ToString());
-                }
+          
 
-                TocOffset = (ulong)GetColumsData2(utf, 0, "TocOffset", 3);
+                TocOffset = (ulong)GetColumsData(utf, 0, "TocOffset", 3);
                 long TocOffsetPos = GetColumnPostion(utf, 0, "TocOffset");
 
-                EtocOffset = (ulong)GetColumsData2(utf, 0, "EtocOffset", 3);
+                EtocOffset = (ulong)GetColumsData(utf, 0, "EtocOffset", 3);
                 long ETocOffsetPos = GetColumnPostion(utf, 0, "EtocOffset");
 
-                ItocOffset = (ulong)GetColumsData2(utf, 0, "ItocOffset", 3);
+                ItocOffset = (ulong)GetColumsData(utf, 0, "ItocOffset", 3);
                 long ITocOffsetPos = GetColumnPostion(utf, 0, "ItocOffset");
 
-                GtocOffset = (ulong)GetColumsData2(utf, 0, "GtocOffset", 3);
+                GtocOffset = (ulong)GetColumsData(utf, 0, "GtocOffset", 3);
                 long GTocOffsetPos = GetColumnPostion(utf, 0, "GtocOffset");
 
-                ContentOffset = (ulong)GetColumsData2(utf, 0, "ContentOffset", 3);
+                ContentOffset = (ulong)GetColumsData(utf, 0, "ContentOffset", 3);
                 long ContentOffsetPos = GetColumnPostion(utf, 0, "ContentOffset");
                 FileTable.Add(CreateFileEntry("CONTENT_OFFSET", ContentOffset, typeof(ulong), ContentOffsetPos, "CPK", "CONTENT", false));
 
-                Files = (uint)GetColumsData2(utf, 0, "Files", 2);
-                Align = (ushort)GetColumsData2(utf, 0, "Align", 1);
+                Files = (uint)GetColumsData(utf, 0, "Files", 2);
+                Align = (ushort)GetColumsData(utf, 0, "Align", 1);
 
                 if (TocOffset != 0xFFFFFFFFFFFFFFFF)
                 {
@@ -194,7 +184,7 @@ namespace CriPakTools
 
             br.BaseStream.Seek((long)TocOffset, SeekOrigin.Begin);
 
-            if (tools.ReadCString(br, 4) != "TOC ")
+            if (Tools.ReadCString(br, 4) != "TOC ")
             {
                 br.Close();
                 return false;
@@ -214,7 +204,7 @@ namespace CriPakTools
             MemoryStream ms = new MemoryStream(utf_packet);
             EndianReader utfr = new EndianReader(ms, false);
 
-            files = new UTF(tools);
+            files = new UTF();
             if (!files.ReadUTF(utfr))
             {
                 br.Close();
@@ -225,6 +215,8 @@ namespace CriPakTools
             ms.Close();
 
             FileEntry temp;
+            
+           
             for (int i = 0; i < files.num_rows; i++)
             {
                 temp = new FileEntry();
@@ -242,7 +234,7 @@ namespace CriPakTools
                 temp.ExtractSizePos = GetColumnPostion(files, i, "ExtractSize");
                 temp.ExtractSizeType = GetColumnType(files, i, "ExtractSize");
 
-                temp.FileOffset = ((ulong)GetColumnData(files, i, "FileOffset") + (ulong)add_offset);
+                 temp.FileOffset = ((ulong)GetColumnData(files, i, "FileOffset") + (ulong)add_offset);
                 temp.FileOffsetPos = GetColumnPostion(files, i, "FileOffset");
                 temp.FileOffsetType = GetColumnType(files, i, "FileOffset");
 
@@ -252,14 +244,17 @@ namespace CriPakTools
 
                 temp.ID = GetColumnData(files, i, "ID");
                 temp.UserString = GetColumnData(files, i, "UserString");
-
-                FileTable.Add(temp);
+                
+              FileTable.Add(temp);
+        
+                   
             }
+               
             files = null;
 
             return true;
         }
-
+    
         public void WriteCPK(BinaryWriter cpk)
         {
             WritePacket(cpk, "CPK ", 0, CPK_packet);
@@ -305,7 +300,7 @@ namespace CriPakTools
         {
             br.BaseStream.Seek((long)startoffset, SeekOrigin.Begin);
 
-            if (tools.ReadCString(br, 4) != "ITOC")
+            if (Tools.ReadCString(br, 4) != "ITOC")
             {
                 br.Close();
                 return false;
@@ -324,7 +319,7 @@ namespace CriPakTools
             MemoryStream ms = new MemoryStream(utf_packet);
             EndianReader utfr = new EndianReader(ms, false);
 
-            files = new UTF(tools);
+            files = new UTF();
             if (!files.ReadUTF(utfr))
             {
                 br.Close();
@@ -368,7 +363,7 @@ namespace CriPakTools
             {
                 ms = new MemoryStream(DataL);
                 utfr = new EndianReader(ms, false);
-                utfDataL = new UTF(tools);
+                utfDataL = new UTF();
                 utfDataL.ReadUTF(utfr);
 
                 for (int i = 0; i < utfDataL.num_rows; i++)
@@ -403,7 +398,7 @@ namespace CriPakTools
             {
                 ms = new MemoryStream(DataH);
                 utfr = new EndianReader(ms, false);
-                utfDataH = new UTF(tools);
+                utfDataH = new UTF();
                 utfDataH.ReadUTF(utfr);
 
                 for (int i = 0; i < utfDataH.num_rows; i++)
@@ -488,7 +483,7 @@ namespace CriPakTools
             files = null;
             utfDataL = null;
             utfDataH = null;
-
+          
             ms.Close();
             utfr.Close();
 
@@ -518,7 +513,7 @@ namespace CriPakTools
         {
             br.BaseStream.Seek((long)startoffset, SeekOrigin.Begin);
 
-            if (tools.ReadCString(br, 4) != "GTOC")
+            if (Tools.ReadCString(br, 4) != "GTOC")
             {
                 br.Close();
                 return false;
@@ -533,7 +528,7 @@ namespace CriPakTools
         {
             br.BaseStream.Seek((long)startoffset, SeekOrigin.Begin);
 
-            if (tools.ReadCString(br, 4) != "ETOC")
+            if (Tools.ReadCString(br, 4) != "ETOC")
             {
                 br.Close();
                 return false;
@@ -554,7 +549,7 @@ namespace CriPakTools
             MemoryStream ms = new MemoryStream(utf_packet);
             EndianReader utfr = new EndianReader(ms, false);
 
-            files = new UTF(tools);
+            files = new UTF();
             if (!files.ReadUTF(utfr))
             {
                 br.Close();
@@ -583,26 +578,31 @@ namespace CriPakTools
 
             m = 0x0000655f;
             t = 0x00004115;
-
+            
             for (int i = 0; i < input.Length; i++)
             {
+   
                 d = input[i];
                 d = (byte)(d ^ (byte)(m & 0xff));
                 result[i] = d;
-                m *= t;
+                m = unchecked(m * t);
+
             }
 
             return result;
         }
-
+       
         public byte[] DecompressCRILAYLA(byte[] input, int USize)
         {
             byte[] result;// = new byte[USize];
 
             MemoryStream ms = new MemoryStream(input);
             EndianReader br = new EndianReader(ms, true);
-
+         
             br.BaseStream.Seek(8, SeekOrigin.Begin); // Skip CRILAYLA
+           
+         
+            
             int uncompressed_size = br.ReadInt32();
             int uncompressed_header_offset = br.ReadInt32();
             result = new byte[uncompressed_size + 0x100];
@@ -695,7 +695,7 @@ namespace CriPakTools
             return out_bits;
         }
 
-        public object GetColumsData2(UTF utf, int row, string Name, int type)
+        public object GetColumsData(UTF utf, int row, string Name, int type)
         {
             object Temp = GetColumnData(utf, row, Name);
 
@@ -734,27 +734,39 @@ namespace CriPakTools
 
         public object GetColumnData(UTF utf, int row, string Name)
         {
-            object result = null;
+               object result = null;
 
-            try
-            {
+            
                 for (int i = 0; i < utf.num_columns; i++)
                 {
+
+                	int storage_flag = (utf.columns[i].flags & (int)UTF.COLUMN_FLAGS.STORAGE_MASK);
+					int ctype = (utf.columns[i].flags &  (int)UTF.COLUMN_FLAGS.TYPE_MASK);
+					
+					if (storage_flag == (int)UTF.COLUMN_FLAGS.STORAGE_CONSTANT){
+						if (utf.columns[i].name == Name){
+						
+							result = utf.columns[i].GetValue();
+							break;
+				
+						}
+						
+						
+					}
+									
+					if (storage_flag == (int)UTF.COLUMN_FLAGS.STORAGE_NONE || storage_flag == (int)UTF.COLUMN_FLAGS.STORAGE_ZERO)
+						{
+								continue;
+						}
+									
+	
                     if (utf.columns[i].name == Name)
                     {
+                    	
                         result = utf.rows[row].rows[i].GetValue();
                         break;
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                //MessageBox.Show(ex.ToString());
-                Console.WriteLine(ex.ToString());
-                return null;
-            }
-
-
 
             return result;
         }
@@ -763,24 +775,41 @@ namespace CriPakTools
         {
             long result = -1;
 
-            try
-            {
+            
                 for (int i = 0; i < utf.num_columns; i++)
                 {
+                	
+
+                	 int storage_flag = (utf.columns[i].flags & (int)UTF.COLUMN_FLAGS.STORAGE_MASK);
+					 int ctype = (utf.columns[i].flags &  (int)UTF.COLUMN_FLAGS.TYPE_MASK);
+					
+					if (storage_flag == (int)UTF.COLUMN_FLAGS.STORAGE_CONSTANT){
+						if (utf.columns[i].name == Name){
+						
+							result = utf.columns[i].position;
+							break;
+							
+
+						}
+						
+						
+					}
+		
+                		if (storage_flag == (int)UTF.COLUMN_FLAGS.STORAGE_NONE || storage_flag == (int)UTF.COLUMN_FLAGS.STORAGE_ZERO)
+						{
+								continue;
+						}
+							
+                	
+                	
                     if (utf.columns[i].name == Name)
                     {
                         result = utf.rows[row].rows[i].position;
                         break;
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                //MessageBox.Show(ex.ToString());
-                Console.WriteLine(ex.ToString());
-                return -1;
-            }
-
+            
+       
             return result;
         }
 
@@ -788,23 +817,40 @@ namespace CriPakTools
         {
             Type result = null;
 
-            try
-            {
+            
                 for (int i = 0; i < utf.num_columns; i++)
                 {
+                	
+                	
+                	  int storage_flag = (utf.columns[i].flags & (int)UTF.COLUMN_FLAGS.STORAGE_MASK);
+					int ctype = (utf.columns[i].flags &  (int)UTF.COLUMN_FLAGS.TYPE_MASK);
+					
+					if (storage_flag == (int)UTF.COLUMN_FLAGS.STORAGE_CONSTANT){
+						if (utf.columns[i].name == Name){
+						
+							result = utf.columns[i].GetType();
+							break;
+		
+						}
+						
+						
+					}
+		
+                		if (storage_flag == (int)UTF.COLUMN_FLAGS.STORAGE_NONE || storage_flag == (int)UTF.COLUMN_FLAGS.STORAGE_ZERO)
+						{
+								continue;
+						}
+							
+                	
+                	
                     if (utf.columns[i].name == Name)
                     {
                         result = utf.rows[row].rows[i].GetType();
                         break;
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                //MessageBox.Show(ex.ToString());
-                Console.WriteLine(ex.ToString());
-                return null;
-            }
+            
+        
 
             return result;
         }
@@ -950,18 +996,18 @@ namespace CriPakTools
         public List<COLUMN> columns;
         public List<ROWS> rows;
 
-        Tools tools;
+       
 
-        public UTF(Tools tool)
+        public UTF()
         {
-            tools = tool;
+          
         }
 
         public bool ReadUTF(EndianReader br)
         {
             long offset = br.BaseStream.Position;
 
-            if (tools.ReadCString(br, 4) != "@UTF")
+            if (Tools.ReadCString(br, 4) != "@UTF")
             {
                 return false;
             }
@@ -995,7 +1041,57 @@ namespace CriPakTools
                     column.flags = br.ReadByte();
                 }
 
-                column.name = tools.ReadCString(br, -1, (long)(br.ReadInt32() + strings_offset));
+                column.name = Tools.ReadCString(br, -1, (long)(br.ReadInt32() + strings_offset));
+                
+                // from YACE
+         
+                if ((column.flags & (int)UTF.COLUMN_FLAGS.STORAGE_MASK) == (int)UTF.COLUMN_FLAGS.STORAGE_CONSTANT){
+                	
+                	column.type = (column.flags & (int)UTF.COLUMN_FLAGS.TYPE_MASK);
+                	column.position =  br.BaseStream.Position;
+                	switch (column.type){
+                			
+                		case 0:
+                        case 1:
+                            column.uint8 = br.ReadByte();
+                            break;
+
+                        case 2:
+                        case 3:
+                            column.uint16 = br.ReadUInt16();
+                            break;
+
+                        case 4:
+                        case 5:
+                            column.uint32 = br.ReadUInt32();
+                            break;
+
+                        case 6:
+                        case 7:
+                           column.uint64 = br.ReadUInt64();
+                        
+                            break;
+
+                        case 8:
+                            column.ufloat = br.ReadSingle();
+                            break;
+
+                        case 0xA:
+                           column.str = Tools.ReadCString(br, -1, br.ReadInt32() + strings_offset);
+                     
+                            break;
+
+                        case 0xB:
+                            long position = br.ReadInt32() + data_offset;
+                            column.position = position;
+                            column.data = Tools.GetData(br, position, br.ReadInt32());
+                            break;
+
+                        default: throw new NotImplementedException();
+                			
+                	}
+                }
+            
                 columns.Add(column);
             }
 
@@ -1069,13 +1165,13 @@ namespace CriPakTools
                             break;
 
                         case 0xA:
-                            current_row.str = tools.ReadCString(br, -1, br.ReadInt32() + strings_offset);
+                            current_row.str = Tools.ReadCString(br, -1, br.ReadInt32() + strings_offset);
                             break;
 
                         case 0xB:
                             long position = br.ReadInt32() + data_offset;
                             current_row.position = position;
-                            current_row.data = tools.GetData(br, position, br.ReadInt32());
+                            current_row.data = Tools.GetData(br, position, br.ReadInt32());
                             break;
 
                         default: throw new NotImplementedException();
@@ -1106,10 +1202,84 @@ namespace CriPakTools
     {
         public COLUMN()
         {
+        	type = -1;
         }
 
+        
+        
+        public int type { get; set; }
+        
         public byte flags { get; set; }
         public string name { get; set; }
+        
+        
+        
+        public object GetValue()
+        {
+            object result = -1;
+
+            switch (this.type)
+            {
+                case 0:
+                case 1: return this.uint8;
+
+                case 2:
+                case 3: return this.uint16;
+
+                case 4:
+                case 5: return this.uint32;
+
+                case 6:
+                case 7: return this.uint64;
+
+                case 8: return this.ufloat;
+
+                case 0xA: return this.str;
+
+                case 0xB: return this.data;
+
+                default: return null;
+            }
+        }
+
+        public Type GetType()
+        {
+            object result = -1;
+
+            switch (this.type)
+            {
+                case 0:
+                case 1: return this.uint8.GetType();
+
+                case 2:
+                case 3: return this.uint16.GetType();
+
+                case 4:
+                case 5: return this.uint32.GetType();
+
+                case 6:
+                case 7: return this.uint64.GetType();
+
+                case 8: return this.ufloat.GetType();
+
+                case 0xA: return this.str.GetType();
+
+                case 0xB: return this.data.GetType();
+
+                default: return null;
+            }
+        }
+
+        //column based datatypes
+        public byte uint8 { get; set; }
+        public ushort uint16 { get; set; }
+        public uint uint32 { get; set; }
+        public ulong uint64 { get; set; }
+        public float ufloat { get; set; }
+        public string str { get; set; }
+        public byte[] data { get; set; }
+        public long position { get; set; }
+
     }
 
     public class ROWS
