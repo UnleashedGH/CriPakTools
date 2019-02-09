@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,18 +7,14 @@ using System.Runtime.InteropServices;
 
 namespace CriPakTools
 {
-    public class Tools
+    public static class Tools
     {
 
-        [DllImport("msvcrt.dll", CallingConvention = CallingConvention.Cdecl)]
-        static extern int memcmp(byte[] b1, byte[] b2, long count);
+       
 
-        public Tools()
-        {
+       
 
-        }
-
-        public string ReadCString(BinaryReader br, int MaxLength = -1, long lOffset = -1, Encoding enc = null)
+        public static string ReadCString(BinaryReader br, int MaxLength = -1, long lOffset = -1, Encoding enc = null)
         {
             int Max;
             if (MaxLength == -1)
@@ -74,18 +70,18 @@ namespace CriPakTools
             return result;
         }
 
-        public void DeleteFileIfExists(string sPath)
+        public static void DeleteFileIfExists(string sPath)
         {
             if (File.Exists(sPath))
                 File.Delete(sPath);
         }
 
-        public string GetPath(string input)
+        public static string GetPath(string input)
         {
             return Path.GetDirectoryName(input) + "\\" + Path.GetFileNameWithoutExtension(input);
         }
 
-        public byte[] GetData(BinaryReader br, long offset, int size)
+        public static byte[] GetData(BinaryReader br, long offset, int size)
         {
             byte[] result = null;
             long backup = br.BaseStream.Position;
