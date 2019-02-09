@@ -14,10 +14,7 @@ namespace CriPakTools
 		public Boolean isInit = false;
 	    public string extractPath { get; set; }
 	      BinaryReader br;
-		
-		
-		
-		
+
 		public CPKFile(){
 			
 			
